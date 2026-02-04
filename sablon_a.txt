@@ -1,0 +1,90 @@
+# ============================================================
+# PARTEA A – PRELUCRAREA DATELOR
+# ============================================================
+
+import pandas as pd
+import numpy as np
+
+# ============================================================
+# 1. CITIREA DATELOR
+# ============================================================
+
+# fisier principal
+df = pd.read_csv("fisier.csv")
+
+# fisier auxiliar (coduri / clasificari)
+df_coduri = pd.read_csv("fisier_coduri.csv")
+
+# ============================================================
+# 2. UNIREA TABELELOR (MERGE)
+# ============================================================
+
+# se face unirea dupa cheia comuna
+df = df.merge(df_coduri, on="Cheie", how="left")
+
+# ============================================================
+# 3. TRATAREA VALORILOR LIPSA
+# ============================================================
+
+# se selecteaza coloanele numerice
+coloane_numerice = df.select_dtypes(include=[np.number]).columns
+
+# valorile lipsa se inlocuiesc cu media
+df[coloane_numerice] = df[coloane_numerice].fillna(
+    df[coloane_numerice].mean()
+)
+
+# ============================================================
+# 4. CERINTA DE FILTRARE
+# ============================================================
+
+# exemplu: selectarea instantelor cu A < 0
+df_filtrat = df[df["A"] < 0]
+
+# se salveaza rezultatul
+df_filtrat.to_csv("cerinta1.csv", index=False)
+
+# ============================================================
+# 5. CALCULUL UNEI MEDII PE LINIE
+# ============================================================
+
+# exemplu: media coloanelor B, C, D
+df["Media"] = df[["B", "C", "D"]].mean(axis=1)
+
+# ============================================================
+# 6. GRUPARE SI AGREGARE
+# ============================================================
+
+# exemplu: medii pe grupa
+df_grup = df.groupby("Grupa")[["A", "B", "C"]].mean()
+
+# salvare rezultat
+df_grup.to_csv("cerinta2.csv")
+
+# ============================================================
+# 7. IDENTIFICAREA MAXIMULUI PE GRUP
+# ============================================================
+
+# exemplu: maximul lui A pe fiecare grupa
+idx = df.groupby("Grupa")["A"].idxmax()
+df_max = df.loc[idx]
+
+df_max.to_csv("cerinta3.csv", index=False)
+
+# ============================================================
+# 8. CALCUL PROCENTE
+# ============================================================
+
+# exemplu: procentul lui B din totalul T
+df["Procent_B"] = df["B"] * 100 / df["T"]
+
+df.to_csv("cerinta4.csv", index=False)
+
+# ============================================================
+# 9. SORTARE REZULTATE
+# ============================================================
+
+# sortare descrescatoare dupa A
+df_sortat = df.sort_values(by="A", ascending=False)
+
+df_sortat.to_csv("cerinta5.csv", index=False)
