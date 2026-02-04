@@ -1,0 +1,179 @@
+# ============================================================
+# TEMPLATE DSAD – REDUCERE DIMENSIONALITATE, CLASIFICARE, CLUSTER
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import (
+    LinearDiscriminantAnalysis,
+    QuadraticDiscriminantAnalysis
+)
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+
+from factor_analyzer import FactorAnalyzer
+
+# ============================================================
+# UTILITARE
+# ============================================================
+
+def citire_date(fisier):
+    df = pd.read_csv(fisier)
+    return df
+
+
+def pregatire_date_numerice(df):
+    X = df.select_dtypes(include=[np.number])
+    X = X.fillna(X.mean())
+    return X
+
+
+def standardizare(X):
+    scaler = StandardScaler()
+    return scaler.fit_transform(X)
+
+# ============================================================
+# TEMA 1 – PCA (Analiza în componente principale)
+# ============================================================
+
+def analiza_pca(fisier):
+    df = citire_date(fisier)
+    X = pregatire_date_numerice(df)
+    X_std = standardizare(X)
+
+    pca = PCA()
+    scoruri = pca.fit_transform(X_std)
+
+    print("\nVariantele componentelor principale:")
+    for i, v in enumerate(pca.explained_variance_):
+        print(f"PC{i+1}: varianta={v:.4f}, procent={pca.explained_variance_ratio_[i]*100:.2f}%")
+
+    df_scoruri = pd.DataFrame(
+        scoruri,
+        columns=[f"PC{i+1}" for i in range(scoruri.shape[1])]
+    )
+    df_scoruri.to_csv("scoruri.csv", index=False)
+
+    plt.scatter(scoruri[:, 0], scoruri[:, 1])
+    plt.xlabel("PC1")
+    plt.ylabel("PC2")
+    plt.title("Scoruri PCA")
+    plt.show()
+
+
+# ============================================================
+# TEMA 1 – ANALIZĂ FACTORIALĂ
+# ============================================================
+
+def analiza_factoriala(fisier, nr_factori=2):
+    df = citire_date(fisier)
+    X = pregatire_date_numerice(df)
+    X_std = standardizare(X)
+
+    fa = FactorAnalyzer(n_factors=nr_factori, rotation="varimax")
+    fa.fit(X_std)
+
+    varianta = fa.get_factor_variance()
+    df_var = pd.DataFrame({
+        "Varianta": varianta[0],
+        "Procent": varianta[1],
+        "Procent Cumulat": varianta[2]
+    })
+    df_var.to_csv("Varianta.csv", index=False)
+
+    loadings = pd.DataFrame(
+        fa.loadings_,
+        index=X.columns,
+        columns=[f"Factor{i+1}" for i in range(nr_factori)]
+    )
+    loadings.to_csv("r.csv")
+
+    scoruri = fa.transform(X_std)
+    df_f = pd.DataFrame(scoruri, columns=[f"F{i+1}" for i in range(nr_factori)])
+    df_f.to_csv("f.csv", index=False)
+
+    plt.scatter(scoruri[:, 0], scoruri[:, 1])
+    plt.xlabel("F1")
+    plt.ylabel("F2")
+    plt.title("Scoruri factoriale")
+    plt.show()
+
+# ============================================================
+# TEMA 2 – ANALIZĂ DISCRIMINANTĂ (LDA)
+# ============================================================
+
+def analiza_lda(fisier, coloana_clasa):
+    df = citire_date(fisier)
+
+    X = df.drop(columns=[coloana_clasa])
+    y = df[coloana_clasa]
+
+    lda = LinearDiscriminantAnalysis()
+    lda.fit(X, y)
+
+    pred = lda.predict(X)
+
+    print("\nMatrice de confuzie:")
+    print(confusion_matrix(y, pred))
+    print("Acuratețe:", accuracy_score(y, pred))
+
+    scoruri = lda.transform(X)
+    df_z = pd.DataFrame(scoruri, columns=["Z1"])
+    df_z.to_csv("z.csv", index=False)
+
+    plt.hist(scoruri)
+    plt.title("Distribuția scorurilor discriminante")
+    plt.show()
+
+# ============================================================
+# TEMA 2 – DISCRIMINARE BAYESIANĂ (QDA)
+# ============================================================
+
+def analiza_qda(fisier, coloana_clasa):
+    df = citire_date(fisier)
+
+    X = df.drop(columns=[coloana_clasa])
+    y = df[coloana_clasa]
+
+    qda = QuadraticDiscriminantAnalysis()
+    qda.fit(X, y)
+
+    pred = qda.predict(X)
+    print("Acuratețe QDA:", accuracy_score(y, pred))
+
+# ============================================================
+# TEMA 3 – CLUSTERING IERARHIC (WARD)
+# ============================================================
+
+def cluster_ierarhic(fisier, nr_clustere=3):
+    df = citire_date(fisier)
+    X = pregatire_date_numerice(df)
+    X_std = standardizare(X)
+
+    Z = linkage(X_std, method="ward")
+
+    df_h = pd.DataFrame(Z, columns=["c1", "c2", "distanta", "nr_instante"])
+    df_h.to_csv("h.csv", index=False)
+
+    dendrogram(Z)
+    plt.title("Dendrogramă Ward")
+    plt.show()
+
+    popt = fcluster(Z, t=nr_clustere, criterion="maxclust")
+    df_popt = pd.DataFrame({"Cluster": popt})
+    df_popt.to_csv("popt.csv", index=False)
+
+# ============================================================
+# EXEMPLU APEL (comentat pentru examen)
+# ============================================================
+
+# analiza_pca("date.csv")
+# analiza_factoriala("date.csv", nr_factori=2)
+# analiza_lda("train.csv", "DECISION")
+# analiza_qda("train.csv", "DECISION")
+# cluster_ierarhic("date.csv", nr_clustere=3)
