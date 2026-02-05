@@ -1,0 +1,1410 @@
+# ============================================================
+# SUBIECT – Diversitate.csv
+# ============================================================
+
+# În fișierul Diversitate.csv sunt prezentați indicii de diversitate
+# economică la nivel de localitate pe ani.
+#
+# Variabile:
+# Siruta – codul Siruta al localității
+# Localitate – denumirea localității
+# 2008, 2009, ..., 2021 – anii pentru care sunt prezentați indicii
+# de diversitate
+#
+# În fișierul Coduri_Localitati.csv se află codificarea localităților
+# și împărțirea acestora pe județe.
+#
+# Variabile:
+# Siruta – codul Siruta
+# Localitate – denumirea localității
+# Judet – indicativul de județ
+#
+# Siruta este câmpul de legătură.
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df = pd.read_csv("Diversitate.csv")
+df_cod = pd.read_csv("Coduri_Localitati.csv")
+
+# Identificarea coloanelor ani
+ani = df.columns.drop(["Siruta", "Localitate"])
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se calculeze și să se salveze în fișierul Cerinta1.csv
+#     valoarea medie a indicelui de diversitate (media pe ani)
+#     la nivel de localitate.
+#
+# Salvarea se va face în ordinea descrescătoare a indicelui
+# de diversitate.
+#
+# Se va salva:
+# Siruta, Localitate, Diversitate (medie)
+#
+# (1 punct)
+#
+# Criteriu:
+# vizualizarea fișierului output și codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Calculul mediei indicelui de diversitate pe localitate
+df["DiversitateMedie"] = df[ani].mean(axis=1)
+
+# Selectarea coloanelor cerute și sortare descrescătoare
+df_c1 = df[["Siruta", "Localitate", "DiversitateMedie"]] \
+    .sort_values(by="DiversitateMedie", ascending=False)
+
+# Salvarea rezultatului
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Să se determine pentru fiecare județ și fiecare an
+#     numărul de localități care au diversitatea 0.
+#
+# Rezultatul va fi salvat în fișierul Cerinta2.csv.
+#
+# Se va salva:
+# Judet, 2008, 2009, ..., 2021
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea fișierului output și codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Unirea cu fișierul de coduri pentru a obține județul
+df_merge = df.merge(
+    df_cod,
+    on=["Siruta", "Localitate"],
+    how="left"
+)
+
+# Inițializare rezultat
+rez = pd.DataFrame()
+rez["Judet"] = df_merge["Judet"].unique()
+
+# Pentru fiecare an se numără localitățile cu diversitate 0
+for an in ani:
+    temp = (
+        df_merge[df_merge[an] == 0]
+        .groupby("Judet")
+        .size()
+    )
+    rez = rez.merge(
+        temp.rename(an),
+        on="Judet",
+        how="left"
+    )
+
+# Înlocuire NaN cu 0 (județe fără diversitate 0 într-un an)
+rez = rez.fillna(0)
+
+# Conversie la int
+rez[ani] = rez[ani].astype(int)
+
+# Salvare rezultat
+rez.to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZĂ DE CLUSTERI – METODA WARD
+# ============================================================
+
+# ------------------------------------------------------------
+# B.1 Matricea ierarhiei Ward.
+#
+# Pentru fiecare joncțiune se specifică:
+# - clusterii intrați în joncțiune
+# - distanța
+# - numărul de instanțe în clusterul nou format
+#
+# Matricea va fi afișată la consolă.
+#
+# (1 punct)
+#
+# Criteriu:
+# vizualizarea outputului și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+# Matricea de date pentru clusterizare
+X = df[ani].values
+
+# Standardizare
+scaler = StandardScaler()
+X_std = scaler.fit_transform(X)
+
+# Aplicarea metodei Ward
+Z = linkage(X_std, method="ward")
+
+# Afișarea matricei ierarhiei
+print("Matricea ierarhiei (Ward):")
+print(Z)
+
+# ------------------------------------------------------------
+# B.2 Graficul dendrogramă pentru partiția optimală.
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea graficului dendrogramă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+plt.figure(figsize=(10, 6))
+dendrogram(Z)
+plt.title("Dendrogramă – indicii de diversitate (Ward)")
+plt.xlabel("Localități")
+plt.ylabel("Distanță")
+plt.show()
+
+# ------------------------------------------------------------
+# B.3 Componența partiției optimale.
+#
+# Pentru fiecare instanță se determină clusterul din care face
+# parte.
+#
+# Partiția se va salva în fișierul popt.csv.
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+# Alegem 3 clusteri (uzual în examene DSAD)
+clusteri = fcluster(Z, 3, criterion="maxclust")
+
+df_popt = pd.DataFrame({
+    "Siruta": df["Siruta"],
+    "Localitate": df["Localitate"],
+    "Cluster": clusteri
+})
+
+df_popt.to_csv("popt.csv", index=False)
+
+
+# ============================================================
+# SUBIECT – CalitateaAeruluiTari.csv
+# ============================================================
+
+# În fișierul CalitateaAeruluiTari.csv sunt prezentate informații
+# privind calitatea aerului la nivel de țară.
+#
+# Indicatorii care măsoară calitatea aerului sunt:
+# - Air_quality_Carbon_Monoxide
+# - Air_quality_Ozone
+# - Air_quality_Nitrogen_dioxide
+# - Air_quality_Sulphur_dioxide
+# - Air_quality_PM2.5
+# - Air_quality_PM10
+#
+# Aceștia cuantifică prezența diverselor particule în aer.
+#
+# Celelalte variabile sunt:
+# - CountryId – codul de țară
+# - Country – numele țării
+#
+# În fișierul CoduriTari.csv se află codificări ale țărilor și
+# împărțirea acestora pe continente.
+#
+# CountryId este câmpul de legătură.
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df = pd.read_csv("CalitateaAeruluiTari.csv")
+df_cod = pd.read_csv("CoduriTari.csv")
+
+# Unirea seturilor de date
+df_merge = df.merge(df_cod, on="CountryId", how="left")
+
+# Lista indicatorilor de calitate a aerului
+indicatori = [
+    "Air_quality_Carbon_Monoxide",
+    "Air_quality_Ozone",
+    "Air_quality_Nitrogen_dioxide",
+    "Air_quality_Sulphur_dioxide",
+    "Air_quality_PM2.5",
+    "Air_quality_PM10"
+]
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Salvarea în fișierul Cerinta1.csv a coeficienților de
+#     variație pentru fiecare indicator.
+#
+# Se va salva pentru fiecare indicator:
+# - numele indicatorului
+# - coeficientul de variație
+#
+# Coeficientul de variație:
+# CV = abaterea standard / media
+#
+# (1 punct)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+cv = []
+
+for ind in indicatori:
+    media = df[ind].mean()
+    std = df[ind].std()
+    cv.append({
+        "Indicator": ind,
+        "CV": std / media
+    })
+
+df_cv = pd.DataFrame(cv)
+
+# Salvarea rezultatului
+df_cv.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Determinarea pentru fiecare continent a indicatorului
+#     cu cel mai mare coeficient de variație.
+#
+# Se va salva:
+# - Continent
+# - Indicator
+# - Valoarea coeficientului de variație
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+rez = []
+
+for cont, g in df_merge.groupby("Continent"):
+    valori_cv = {}
+    for ind in indicatori:
+        valori_cv[ind] = g[ind].std() / g[ind].mean()
+
+    ind_max = max(valori_cv, key=valori_cv.get)
+
+    rez.append({
+        "Continent": cont,
+        "Indicator": ind_max,
+        "CV": valori_cv[ind_max]
+    })
+
+df_c2 = pd.DataFrame(rez)
+
+# Salvarea rezultatului
+df_c2.to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZA ÎN COMPONENTE PRINCIPALE (PCA)
+# ============================================================
+
+# ------------------------------------------------------------
+# B. Să se efectueze analiza în componente principale
+#    standardizată pe indicatorii privind calitatea aerului
+#    și să se furnizeze următoarele rezultate:
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# B.1 Varianțele componentelor principale.
+#
+# Varianțele vor fi afișate la consolă.
+#
+# (1 punct)
+#
+# Criteriu:
+# urmărirea outputului și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+X = df[indicatori].values
+
+# Standardizare
+scaler = StandardScaler()
+X_std = scaler.fit_transform(X)
+
+# PCA
+pca = PCA()
+scoruri = pca.fit_transform(X_std)
+
+print("Varianțele componentelor principale:")
+for i, v in enumerate(pca.explained_variance_):
+    print(f"PC{i+1}: {v}")
+
+# ------------------------------------------------------------
+# B.2 Scorurile asociate instanțelor.
+#
+# Scorurile vor fi salvate în fișierul scoruri.csv.
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+df_scoruri = pd.DataFrame(
+    scoruri,
+    columns=[f"PC{i+1}" for i in range(scoruri.shape[1])]
+)
+
+df_scoruri.insert(0, "CountryId", df["CountryId"])
+df_scoruri.insert(1, "Country", df["Country"])
+
+df_scoruri.to_csv("scoruri.csv", index=False)
+
+# ------------------------------------------------------------
+# B.3 Graficul scorurilor în primele două axe principale.
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea graficului
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+plt.figure(figsize=(8, 6))
+plt.scatter(scoruri[:, 0], scoruri[:, 1])
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+plt.title("Scoruri PCA – Calitatea aerului")
+plt.show()
+
+
+
+# ============================================================
+# SUBIECT – Diversitate.csv
+# ============================================================
+
+# În fișierul Diversitate.csv sunt prezentați indicii de diversitate
+# economică la nivel de localitate pe ani.
+#
+# Variabile:
+# - Siruta      : codul Siruta al localității
+# - Localitate : denumirea localității
+# - 2008, 2009, ..., 2021 : indicii de diversitate
+#
+# În fișierul Coduri_Localitati.csv se află codificarea localităților
+# și împărțirea acestora pe județe.
+#
+# Variabile:
+# - Siruta
+# - Localitate
+# - Judet
+#
+# Siruta este câmpul de legătură.
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from factor_analyzer import FactorAnalyzer
+from factor_analyzer.factor_analyzer import calculate_kmo
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df = pd.read_csv("Diversitate.csv")
+df_cod = pd.read_csv("Coduri_Localitati.csv")
+
+# Lista anilor
+ani = df.columns.drop(["Siruta", "Localitate"])
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se calculeze și să se salveze în fișierul Cerinta1.csv
+#     localitățile în care diversitatea medie pe cei 14 ani
+#     (2008–2021) este mai mare decât diversitatea din anul 2021.
+#
+# Se va salva:
+# - Siruta
+# - Localitate
+# - Diversitatea medie (2008–2021)
+# - Diversitatea în 2021
+#
+# (1 punct)
+#
+# Criteriu:
+# vizualizarea fișierului output și codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Calcul diversitate medie pe ani
+df["Div_Medie"] = df[ani].mean(axis=1)
+
+# Filtrare: medie > valoare 2021
+df_c1 = df[df["Div_Medie"] > df["2021"]]
+
+# Selectarea coloanelor cerute
+df_c1 = df_c1[["Siruta", "Localitate", "Div_Medie", "2021"]]
+
+# Salvare rezultat
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Să se determine pentru fiecare județ anul în care
+#     diversitatea medie (media pe localități) este maximă.
+#
+# Rezultatul se va salva în fișierul Cerinta2.csv.
+#
+# Se va salva:
+# - Judet
+# - Anul cu diversitatea medie maximă
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea fișierului output și codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Unirea cu județele
+df_merge = df.merge(df_cod, on=["Siruta", "Localitate"], how="left")
+
+rez = []
+
+for judet, g in df_merge.groupby("Judet"):
+    medii_ani = g[ani].mean()
+    anul_max = medii_ani.idxmax()
+    rez.append({
+        "Judet": judet,
+        "Anul": anul_max
+    })
+
+df_c2 = pd.DataFrame(rez)
+
+# Salvare rezultat
+df_c2.to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZĂ FACTORIALĂ (VARIMAX)
+# ============================================================
+
+# ------------------------------------------------------------
+# B. Să se efectueze analiza factorială pentru indicii de
+#    diversitate, cu rotație Varimax și să se furnizeze:
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# B.1 Indexul KMO general și la nivel de variabile.
+#
+# Indecșii vor fi salvați în fișierul KMO.csv.
+#
+# (1 punct)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+X = df[ani].values
+
+# Standardizare
+scaler = StandardScaler()
+X_std = scaler.fit_transform(X)
+
+# Calcul KMO
+kmo_all, kmo_global = calculate_kmo(X_std)
+
+df_kmo = pd.DataFrame({
+    "Variabila": ani,
+    "KMO": kmo_all
+})
+
+df_kmo.loc[len(df_kmo)] = ["KMO_Global", kmo_global]
+
+df_kmo.to_csv("KMO.csv", index=False)
+
+# ------------------------------------------------------------
+# B.2 Scorurile factoriale.
+#
+# Scorurile vor fi salvate în fișierul f.csv.
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+fa = FactorAnalyzer(rotation="varimax")
+fa.fit(X_std)
+
+scoruri = fa.transform(X_std)
+
+df_f = pd.DataFrame(
+    scoruri,
+    columns=[f"F{i+1}" for i in range(scoruri.shape[1])]
+)
+
+df_f.insert(0, "Siruta", df["Siruta"])
+df_f.insert(1, "Localitate", df["Localitate"])
+
+df_f.to_csv("f.csv", index=False)
+
+# ------------------------------------------------------------
+# B.3 Trasarea plotului scorurilor pentru primii doi factori
+#     comuni.
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea graficului
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+plt.figure(figsize=(8, 6))
+plt.scatter(scoruri[:, 0], scoruri[:, 1])
+plt.xlabel("Factor 1")
+plt.ylabel("Factor 2")
+plt.title("Scoruri factoriale – Diversitate")
+plt.show()
+
+
+# ============================================================
+# SUBIECT – Netflix.csv
+# ============================================================
+
+# În fișierul Netflix.csv se află informații referitoare la
+# accesibilitatea platformei Netflix în 57 de țări, în anul 2022.
+#
+# Variabile:
+# - Tara, Cod
+# - Librarie
+# - CostLunarBasic
+# - CostLunarStandard
+# - CostLunarPremium
+# - Internet
+# - HDI
+# - Venit
+# - IndiceFericire
+# - IndiceEducatie
+#
+# În fișierul CoduriTari.csv se află codificări ale țărilor și
+# apartenența la continente.
+# Legătura dintre seturile de date se face prin Cod.
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df_net = pd.read_csv("Netflix.csv")
+df_cod = pd.read_csv("CoduriTari.csv")
+
+# Curățare nume coloane
+df_net.columns = df_net.columns.str.strip()
+df_cod.columns = df_cod.columns.str.strip()
+
+# Unire seturi de date
+df = df_net.merge(df_cod, on="Cod", how="left")
+
+# Variabile numerice analizate
+variabile = [
+    "Librarie",
+    "CostLunarBasic",
+    "CostLunarStandard",
+    "CostLunarPremium",
+    "Internet",
+    "HDI",
+    "Venit",
+    "IndiceFericire",
+    "IndiceEducatie"
+]
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se standardizeze setul de date (indicatorii de la
+#     Librarie la IndiceEducatie) și să se salveze în fișierul
+#     Cerinta1.csv în ordinea descrescătoare după Internet.
+#
+# (1 punct)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+scaler = StandardScaler()
+X_std = scaler.fit_transform(df[variabile])
+
+df_std = pd.DataFrame(X_std, columns=variabile)
+
+# Reatașare variabile identificare
+df_std.insert(0, "Tara", df["Tara"])
+df_std.insert(0, "Cod", df["Cod"])
+
+# Sortare descrescătoare după Internet
+df_std = df_std.sort_values(by="Internet", ascending=False)
+
+# Salvare rezultat
+df_std.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Să se determine coeficienții de variație pentru fiecare
+#     indicator la nivel de continent.
+#
+# Coeficient de variație = abatere standard / medie
+#
+# Salvarea se face descrescător după Librarie.
+#
+# (2 puncte)
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+media = df.groupby("Continent")[variabile].mean()
+std = df.groupby("Continent")[variabile].std()
+
+cv = std / media
+
+# Sortare descrescătoare după Librarie
+cv = cv.sort_values(by="Librarie", ascending=False)
+
+# Salvare rezultat
+cv.reset_index().to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZĂ ÎN COMPONENTE PRINCIPALE (PCA)
+# ============================================================
+
+# ------------------------------------------------------------
+# B.1 Varianța componentelor principale.
+#
+# Pentru fiecare componentă se calculează:
+# - varianța
+# - procentul de varianță
+# - varianța cumulată
+# - procentul cumulat
+#
+# Rezultatele se salvează în fișierul Varianta.csv.
+#
+# (1 punct)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+X = scaler.fit_transform(df[variabile])
+
+pca = PCA()
+pca.fit(X)
+
+varianta = pca.explained_variance_
+procent = pca.explained_variance_ratio_
+varianta_cum = np.cumsum(varianta)
+procent_cum = np.cumsum(procent)
+
+df_var = pd.DataFrame({
+    "Varianta": varianta,
+    "Procent": procent,
+    "Varianta_Cumulata": varianta_cum,
+    "Procent_Cumulat": procent_cum
+})
+
+df_var.to_csv("Varianta.csv", index=False)
+
+# ------------------------------------------------------------
+# B.2 Plot varianță componente cu evidențierea criteriilor
+#     de relevanță.
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+plt.figure(figsize=(8, 5))
+plt.plot(range(1, len(varianta) + 1), varianta, marker="o")
+plt.axhline(1, color="red", linestyle="--", label="Criteriul Kaiser")
+plt.xlabel("Componenta principală")
+plt.ylabel("Varianță")
+plt.title("Plot varianță componente principale")
+plt.legend()
+plt.show()
+
+# ------------------------------------------------------------
+# B.3 Calcul comunalități și salvarea lor în fișierul comm.csv.
+#
+# Comunalitatea = suma pătratelor încărcărilor pe componente
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+# Încărcări factoriale
+loadings = pca.components_.T * np.sqrt(varianta)
+
+# Comunalități
+comunalitati = np.sum(loadings ** 2, axis=1)
+
+df_comm = pd.DataFrame({
+    "Variabila": variabile,
+    "Comunalitate": comunalitati
+})
+
+df_comm.to_csv("comm.csv", index=False)
+
+
+# ============================================================
+# SUBIECT – GlobalIndicatorsPerCapita_2021.csv
+# ============================================================
+
+# În fișierul GlobalIndicatorsPerCapita_2021.csv sunt prezentați
+# indicatori macroeconomici pe țări, la nivel mondial, pentru anul 2021.
+#
+# Indicatori:
+# CountryID – număr unic de identificare țară
+# Country – numele țării
+# GNI – venitul național brut pe locuitor
+# ChangesInv – variația stocurilor
+# Exports, Imports – export și import
+# FinalConsExp – cheltuieli pentru consumul final
+# GrossCF – formarea brută de capital fix
+# HouseholdConsExp – cheltuieli de consum ale gospodăriilor
+# AgrHuntForFish, Construction, Manufacturing, MiningManUt,
+# TradeT, TransportComm, Other – valoarea adăugată pe ramuri
+#
+# În fișierul CoduriTari.csv se află codificări ale țărilor
+# și împărțirea acestora pe continente.
+# Legătura se face prin CountryID.
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_samples
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df = pd.read_csv("GlobalIndicatorsPerCapita_2021.csv")
+df_cod = pd.read_csv("CoduriTari.csv")
+
+# Curățare nume coloane
+df.columns = df.columns.str.strip()
+df_cod.columns = df_cod.columns.str.strip()
+
+# Unire seturi de date
+df = df.merge(df_cod, on="CountryID", how="left")
+
+# Înlocuire valori lipsă cu media (practică standard DSAD)
+num_cols = df.select_dtypes(include=[np.number]).columns
+df[num_cols] = df[num_cols].fillna(df[num_cols].mean())
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Salvarea în fișierul Cerinta1.csv a ramurii cu valoarea
+#     adăugată cea mai mare pentru fiecare țară.
+#
+# Se salvează:
+# - CountryID
+# - Country
+# - denumirea indicatorului dominant
+#
+# (1 punct)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+ramuri = [
+    "AgrHuntForFish", "Construction", "Manufacturing",
+    "MiningManUt", "TradeT", "TransportComm", "Other"
+]
+
+df["Ramura_Dominanta"] = df[ramuri].idxmax(axis=1)
+
+df_c1 = df[["CountryID", "Country", "Ramura_Dominanta"]]
+
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Salvarea în fișierul Cerinta2.csv a țărilor cu valori
+#     maxime pe indicatori, la nivel de continent.
+#
+# Pentru fiecare continent se salvează codurile țărilor
+# cu valori maxime pentru fiecare indicator.
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+indicatori = [
+    "GNI", "ChangesInv", "Exports", "Imports",
+    "FinalConsExp", "GrossCF", "HouseholdConsExp"
+] + ramuri
+
+rez = df[["Continent"]].drop_duplicates().set_index("Continent")
+
+for ind in indicatori:
+    idx = df.groupby("Continent")[ind].idxmax()
+    ser = df.loc[idx].set_index("Continent")["CountryID"]
+    rez[ind] = ser
+
+rez.reset_index().to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZĂ DE CLUSTERI – METODA WARD
+# ============================================================
+
+# ------------------------------------------------------------
+# B.1 Dendrograma partiției cu 3 clusteri.
+#
+# (1 punct)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+X = df[indicatori].values
+
+scaler = StandardScaler()
+X_std = scaler.fit_transform(X)
+
+Z = linkage(X_std, method="ward")
+
+plt.figure(figsize=(10, 6))
+dendrogram(Z)
+plt.title("Dendrogramă – metoda Ward")
+plt.xlabel("Țări")
+plt.ylabel("Distanță")
+plt.show()
+
+# ------------------------------------------------------------
+# B.2 Componența partiției cu 3 clusteri + scor Silhouette.
+#
+# Rezultatul se salvează în p3.csv:
+# CountryID, Country, Cluster, Silhouette
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+clusteri = fcluster(Z, 3, criterion="maxclust")
+
+sil = silhouette_samples(X_std, clusteri)
+
+df_p3 = pd.DataFrame({
+    "CountryID": df["CountryID"],
+    "Country": df["Country"],
+    "Cluster": clusteri,
+    "Silhouette": sil
+})
+
+df_p3.to_csv("p3.csv", index=False)
+
+# ------------------------------------------------------------
+# B.3 Trasare plot partiție în axe principale (PCA),
+#     pentru partiția cu 3 clusteri.
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_std)
+
+plt.figure(figsize=(8, 6))
+plt.scatter(X_pca[:, 0], X_pca[:, 1], c=clusteri, cmap="tab10")
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+plt.title("Partiție în 3 clusteri – axe principale")
+plt.colorbar(label="Cluster")
+plt.show()
+
+
+# ============================================================
+# SUBIECT – Netflix.csv
+# ============================================================
+
+# În fișierul Netflix.csv se află informații referitoare la
+# accesibilitatea platformei Netflix în 57 de țări, în anul 2022.
+#
+# Variabile:
+# - Tara, Cod
+# - Librarie
+# - CostLunarBasic
+# - CostLunarStandard
+# - CostLunarPremium
+# - Internet
+# - HDI
+# - Venit
+# - IndiceFericire
+# - IndiceEducatie
+#
+# În fișierul CoduriTari.csv se află codificări ale țărilor și
+# apartenența la continente.
+# Legătura dintre seturile de date se face prin Cod.
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from factor_analyzer import FactorAnalyzer
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df_net = pd.read_csv("Netflix.csv")
+df_cod = pd.read_csv("CoduriTari.csv")
+
+# Curățare nume coloane
+df_net.columns = df_net.columns.str.strip()
+df_cod.columns = df_cod.columns.str.strip()
+
+# Unire seturi de date
+df = df_net.merge(df_cod, on="Cod", how="left")
+
+# Variabile numerice analizate
+variabile = [
+    "Librarie",
+    "CostLunarBasic",
+    "CostLunarStandard",
+    "CostLunarPremium",
+    "Internet",
+    "HDI",
+    "Venit",
+    "IndiceFericire",
+    "IndiceEducatie"
+]
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se determine pentru fiecare variabilă numerică
+#     (de la Librarie la IndiceEducatie) țara cu valoarea maximă.
+#
+# Rezultatul se salvează în Cerinta1.csv:
+# Variabila, Tara
+#
+# (1 punct)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+rez = []
+
+for var in variabile:
+    idx = df[var].idxmax()
+    rez.append({
+        "Variabila": var,
+        "Tara": df.loc[idx, "Tara"]
+    })
+
+df_c1 = pd.DataFrame(rez)
+
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Să se calculeze și să se salveze în fișiere CSV
+#     matricele de corelație dintre variabilele numerice
+#     (Librarie – IndiceEducatie) la nivel de continent.
+#
+# Fiecare continent → un fișier:
+# Europa.csv, Asia.csv etc.
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+for continent, g in df.groupby("Continent"):
+    corr = g[variabile].corr()
+    nume_fisier = f"{continent}.csv"
+    corr.to_csv(nume_fisier)
+
+# ============================================================
+# B. ANALIZĂ FACTORIALĂ (FĂRĂ ROTAȚIE)
+# ============================================================
+
+# ------------------------------------------------------------
+# B.1 Corelațiile factoriale (încărcările factoriale).
+#     Rezultatele se salvează în fișierul R.csv.
+#
+# (1 punct)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+# Standardizare date
+scaler = StandardScaler()
+X_std = scaler.fit_transform(df[variabile])
+
+# Analiză factorială fără rotație
+fa = FactorAnalyzer(rotation=None)
+fa.fit(X_std)
+
+# Corelații factoriale (încărcări)
+loadings = pd.DataFrame(
+    fa.loadings_,
+    index=variabile,
+    columns=[f"F{i+1}" for i in range(fa.loadings_.shape[1])]
+)
+
+loadings.to_csv("R.csv")
+
+# ------------------------------------------------------------
+# B.2 Cercul corelațiilor pentru primii trei factori.
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+for f1, f2 in [(0, 1), (0, 2), (1, 2)]:
+    plt.figure(figsize=(6, 6))
+
+    for i, var in enumerate(variabile):
+        plt.arrow(
+            0, 0,
+            loadings.iloc[i, f1],
+            loadings.iloc[i, f2],
+            head_width=0.03,
+            length_includes_head=True
+        )
+        plt.text(
+            loadings.iloc[i, f1],
+            loadings.iloc[i, f2],
+            var
+        )
+
+    # Cerc unitate
+    circle = plt.Circle((0, 0), 1, fill=False)
+    plt.gca().add_artist(circle)
+
+    plt.axhline(0)
+    plt.axvline(0)
+    plt.xlabel(f"Factor {f1+1}")
+    plt.ylabel(f"Factor {f2+1}")
+    plt.title(f"Cercul corelațiilor – F{f1+1} vs F{f2+1}")
+    plt.axis("equal")
+    plt.show()
+
+# ------------------------------------------------------------
+# B.3 Calcul comunalități și varianțe specifice.
+#     Rezultatele se salvează în fișierul comm_spec.csv.
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+comunalitati = np.sum(loadings.values ** 2, axis=1)
+varianta_specifica = 1 - comunalitati
+
+df_comm = pd.DataFrame({
+    "Variabila": variabile,
+    "Comunalitate": comunalitati,
+    "Varianta_Specifica": varianta_specifica
+})
+
+df_comm.to_csv("comm_spec.csv", index=False)
+
+
+
+# ============================================================
+# SUBIECT – ElectricityProduction.csv & Emissions.csv
+# ============================================================
+
+# În fișierul ElectricityProduction.csv se află structura producției
+# de energie electrică pe tipuri de centrale (coal ... other).
+#
+# În fișierul Emissions.csv se află emisiile de particule:
+# AirEmiss, Sulphur, Nitrogen, Ammonia, NonMeth, Partic,
+# GreenGE, GreenGIE.
+#
+# Emisiile sunt în tone, cu excepția GreenGE și GreenGIE
+# (exprimate în mii tone).
+#
+# În fișierul PopulatieEuropa.csv se află populația și regiunea
+# fiecărei țări europene.
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cross_decomposition import CCA
+from scipy.stats import chi2
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df_prod = pd.read_csv("ElectricityProduction.csv")
+df_em = pd.read_csv("Emissions.csv")
+df_pop = pd.read_csv("PopulatieEuropa.csv")
+
+# Curățare coloane
+for df in [df_prod, df_em, df_pop]:
+    df.columns = df.columns.str.strip()
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Salvarea în fișierul Cerinta1.csv a emisiilor totale
+#     de particule la nivel de țară, exprimate în tone.
+#
+# Se va salva:
+# CountryCode, Country, Emisii_total_tone
+#
+# (1 punct)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Conversie GreenGE și GreenGIE din mii tone în tone
+df_em["GreenGE_tone"] = df_em["GreenGE"] * 1000
+df_em["GreenGIE_tone"] = df_em["GreenGIE"] * 1000
+
+# Lista emisiilor (toate în tone)
+emisii = [
+    "AirEmiss", "Sulphur", "Nitrogen", "Ammonia",
+    "NonMeth", "Partic", "GreenGE_tone", "GreenGIE_tone"
+]
+
+# Calcul emisii totale
+df_em["Emisii_total_tone"] = df_em[emisii].sum(axis=1)
+
+df_c1 = df_em[["CountryCode", "Country", "Emisii_total_tone"]]
+
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Salvarea în fișierul Cerinta2.csv a emisiilor de particule
+#     la 100000 locuitori, la nivel de regiune.
+#
+# Formula: v * 100000 / populație
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Unire emisii + populație
+df_merge = df_em.merge(df_pop, on=["CountryCode", "Country"], how="left")
+
+# Agregare pe regiune
+df_reg = df_merge.groupby("Region").agg(
+    {**{e: "sum" for e in emisii}, "Population": "sum"}
+)
+
+# Raportare la 100000 locuitori
+for e in emisii:
+    df_reg[e] = df_reg[e] * 100000 / df_reg["Population"]
+
+df_reg = df_reg.drop(columns=["Population"])
+
+df_reg.reset_index().to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZĂ CANONICĂ (CCA)
+# ============================================================
+
+# ------------------------------------------------------------
+# Set 1: structura producției de energie (coal ... other)
+# Set 2: emisiile (AirEmiss ... GreenGIE)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B ======================
+
+# Variabile set 1
+X_vars = df_prod.columns.drop(["CountryCode", "Country"])
+
+# Variabile set 2
+Y_vars = [
+    "AirEmiss", "Sulphur", "Nitrogen", "Ammonia",
+    "NonMeth", "Partic", "GreenGE", "GreenGIE"
+]
+
+# Unire producție + emisii
+df_cca = df_prod.merge(df_em, on=["CountryCode", "Country"], how="inner")
+
+X = df_cca[X_vars].values
+Y = df_cca[Y_vars].values
+
+# Standardizare
+scX = StandardScaler()
+scY = StandardScaler()
+
+X_std = scX.fit_transform(X)
+Y_std = scY.fit_transform(Y)
+
+# ------------------------------------------------------------
+# B.1 Scoruri canonice
+#
+# Se salvează:
+# z.csv – scoruri set 1
+# u.csv – scoruri set 2
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+cca = CCA(n_components=min(X_std.shape[1], Y_std.shape[1]))
+Z, U = cca.fit_transform(X_std, Y_std)
+
+df_z = pd.DataFrame(Z, columns=[f"Z{i+1}" for i in range(Z.shape[1])])
+df_u = pd.DataFrame(U, columns=[f"U{i+1}" for i in range(U.shape[1])])
+
+df_z.to_csv("z.csv", index=False)
+df_u.to_csv("u.csv", index=False)
+
+# ------------------------------------------------------------
+# B.2 Corelațiile canonice
+#
+# Se salvează în r.csv
+#
+# (1 punct)
+# ------------------------------------------------------------
+
+r = [np.corrcoef(Z[:, i], U[:, i])[0, 1] for i in range(Z.shape[1])]
+
+df_r = pd.DataFrame({
+    "Pereche": [f"Z{i+1}-U{i+1}" for i in range(len(r))],
+    "Corelatie": r
+})
+
+df_r.to_csv("r.csv", index=False)
+
+# ------------------------------------------------------------
+# B.3 Testul Bartlett pentru semnificația perechilor canonice
+#
+# Se afișează:
+# - valorile chi2
+# - p-values
+# - numărul de rădăcini cu p < 0.01
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+n = X_std.shape[0]
+p = X_std.shape[1]
+q = Y_std.shape[1]
+
+print("Test Bartlett – semnificație canonică")
+
+nr_semnificative = 0
+
+for i, rc in enumerate(r):
+    chi_sq = -(n - 1 - (p + q + 1) / 2) * np.log(1 - rc**2)
+    df_b = (p - i) * (q - i)
+    p_val = 1 - chi2.cdf(chi_sq, df_b)
+
+    print(f"Perechea {i+1}: chi2={chi_sq:.4f}, p-value={p_val:.6f}")
+
+    if p_val < 0.01:
+        nr_semnificative += 1
+
+print(f"Număr perechi semnificative (p < 0.01): {nr_semnificative}")
+
