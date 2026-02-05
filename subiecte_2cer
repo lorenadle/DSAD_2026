@@ -973,3 +973,182 @@ plt.ylabel("Factor 2")
 plt.title("Cercul corelațiilor – primii doi factori")
 plt.axis("equal")
 plt.show()
+
+# ============================================================
+# SUBIECT – GlobalIndicatorsPerCapita_2021
+# ============================================================
+
+# În fișierul GlobalIndicatorsPerCapita_2021.csv sunt prezentați
+# indicatori macroeconomici pe țări, la nivel mondial, în anul 2021.
+#
+# Indicatori:
+# CountryID – Număr unic de identificare țară
+# Country – Numele țării
+# GNI – Venitul național brut pe locuitor
+# ChangesInv – Variația stocurilor
+# Exports, Imports – Exporturi și importuri
+# FinalConsExp – Cheltuieli pentru consum final
+# GrossCF – Formarea brută de capital fix
+# HouseholdConsExp – Consum final gospodării
+# AgrHuntForFish, Construction, Manufacturing,
+# MiningManUt, TradeT, TransportComm, Other –
+# Valoare adăugată pe ramuri
+#
+# Datele sunt exprimate în USD per capita.
+#
+# În fișierul CoduriTari.csv se află:
+# CountryID – cod țară
+# Country – numele țării (nu identic cu primul fișier)
+# Continent – continentul
+#
+# Legătura dintre fișiere se face prin CountryID.
+#
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_samples
+from scipy.cluster.hierarchy import linkage, fcluster
+
+# ============================================================
+# CITIRE ȘI PRELUCRARE DATE
+# ============================================================
+
+df = pd.read_csv("GlobalIndicatorsPerCapita_2021.csv")
+df_cod = pd.read_csv("CoduriTari.csv")
+
+# Unirea seturilor de date după CountryID
+df = df.merge(df_cod, on="CountryID", how="left",   suffixes=("", "_cod"))
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se salveze în fișierul Cerinta1.csv, pentru fiecare țară,
+#     ramura cu valoarea adăugată cea mai mare.
+#
+# Se va salva:
+# CountryID, Country, Ramura Dominanta
+#
+# Indicatorii pe ramuri sunt:
+# AgrHuntForFish, Construction, Manufacturing,
+# MiningManUt, TradeT, TransportComm, Other
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+ramuri = [
+    "AgrHuntForFish", "Construction", "Manufacturing",
+    "MiningManUt", "TradeT", "TransportComm", "Other"
+]
+
+df["Ramura Dominanta"] = df[ramuri].idxmax(axis=1)
+
+df_c1 = df[["CountryID", "Country", "Ramura Dominanta"]]
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Salvarea în fișierul Cerinta2.csv a țărilor la care s-au
+#     înregistrat cele mai mari valori pentru indicatorii:
+#     GNI până la Other, la nivel de continent.
+#
+# Pentru fiecare continent se vor salva:
+# Continent + id-urile țărilor cu valori maxime.
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+indicatori = [
+    "GNI", "ChangesInv", "Exports", "Imports",
+    "FinalConsExp", "GrossCF", "HouseholdConsExp"
+] + ramuri
+
+rez = df[["Continent"]].drop_duplicates().set_index("Continent")
+
+for ind in indicatori:
+    idx = df.groupby("Continent")[ind].idxmax()
+    #rez[ind] = df.loc[idx, "CountryID"].values
+    ser = df.loc[idx].set_index("Continent")["CountryID"]
+    rez[ind] = ser
+
+rez.reset_index().to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZĂ DE CLUSTERI – METODA WARD
+# ============================================================
+
+# ------------------------------------------------------------
+# B.1 Matricea ierarhiei (Ward).
+#     Se vor afișa la consolă:
+#     - clusterii intrați în joncțiune
+#     - distanța
+#     - numărul de instanțe
+#
+# Criteriu:
+# vizualizarea outputului și a codului sursă
+# ------------------------------------------------------------
+
+X = df[indicatori].values
+
+scaler = StandardScaler()
+X_std = scaler.fit_transform(X)
+
+Z = linkage(X_std, method="ward")
+
+print("Matricea ierarhiei (Ward):")
+print(Z)
+
+# ------------------------------------------------------------
+# B.2 Componența partiției în 3 clusteri.
+#
+# Pentru fiecare instanță se va salva:
+# CountryID, Country, Cluster, Silhouette
+#
+# Fișier: p3.csv
+#
+# Criteriu:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+clusteri = fcluster(Z, 3, criterion="maxclust")
+sil = silhouette_samples(X_std, clusteri)
+
+df_p3 = pd.DataFrame({
+    "CountryID": df["CountryID"],
+    "Country": df["Country"],
+    "Cluster": clusteri,
+    "Silhouette": sil
+})
+
+df_p3.to_csv("p3.csv", index=False)
+
+# ------------------------------------------------------------
+# B.3 Grafic histogramă pentru variabila GNI,
+#     corespunzător partiției în 3 clusteri.
+#
+# Criteriu:
+# vizualizarea graficului
+# ------------------------------------------------------------
+
+plt.figure(figsize=(8, 6))
+
+for c in np.unique(clusteri):
+    plt.hist(
+        df.loc[clusteri == c, "GNI"],
+        alpha=0.6,
+        label=f"Cluster {c}"
+    )
+
+plt.xlabel("GNI")
+plt.ylabel("Frecvență")
+plt.title("Histogramă GNI – partiție Ward (3 clusteri)")
+plt.legend()
+plt.show()
