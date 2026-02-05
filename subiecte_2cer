@@ -1,0 +1,975 @@
+# ============================================================
+# SUBIECTUL SI_1
+# ============================================================
+
+# În fișierul Indicatori.csv sunt prezentați indicatori ai activității
+# firmelor la nivel de localitate pentru anul 2008.
+# Indicatori:
+# NR_FIRME - numărul de firme
+# NSAL - numărul de salariați
+# CFA - cifra de afaceri
+# PROFITN - profitul net
+# PIERDEREN - pierderea netă
+# Variabila SIRUTA reprezintă codul Siruta al localității.
+#
+# În fișierul PopulatieLocalitati.csv se află codurile Siruta ale
+# localităților, indicativele de județ și populația la nivel de localități.
+#
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+
+
+# ============================================================
+# A. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se determine localitățile cu cifra de afaceri mai mare
+#     decât valoarea medie a cifrei de afaceri pe țară și să se
+#     salveze în fișierul Cerinta1.csv.
+#     Se vor salva codul Siruta și valorile indicatorilor,
+#     în ordinea descrescătoare a cifrei de afaceri. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Citirea fișierului Indicatori.csv
+df_ind = pd.read_csv("Indicatori.csv")
+
+# Calcularea valorii medii a cifrei de afaceri la nivel național
+cfa_medie = df_ind["CFA"].mean()
+
+# Selectarea localităților cu CFA mai mare decât media
+df_c1 = df_ind[df_ind["CFA"] > cfa_medie]
+
+# Sortarea descrescătoare după CFA
+df_c1 = df_c1.sort_values(by="CFA", ascending=False)
+
+# Selectarea coloanelor cerute
+df_c1 = df_c1[
+    ["SIRUTA", "NR_FIRME", "NSAL", "CFA", "PROFITN", "PIERDEREN"]
+]
+
+# Salvarea rezultatului
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+
+# ------------------------------------------------------------
+# A.2 Să se determine valorile indicatorilor raportate la populație
+#     (la 1000 locuitori), la nivel de județ și să se salveze
+#     în fișierul Cerinta2.csv.
+#     Valoarea pentru un indicator la 1000 locuitori se calculează astfel:
+#     v_1000 = v*1000/p,
+#     unde v_1000 este valoarea indicatorului la 1000 locuitori,
+#     v este valoarea indicatorului iar p este populația. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Citirea fișierului PopulatieLocalitati.csv
+df_pop = pd.read_csv("PopulatieLocalitati.csv")
+
+# Unirea tabelelor Indicatori și Populație după codul SIRUTA
+df_merge = df_ind.merge(df_pop, left_on="SIRUTA", right_on="Siruta", how="left")
+
+# Agregarea indicatorilor și populației la nivel de județ
+df_judet = df_merge.groupby("Judet").agg({
+    "NR_FIRME": "sum",
+    "NSAL": "sum",
+    "CFA": "sum",
+    "PROFITN": "sum",
+    "PIERDEREN": "sum",
+    "Populatie": "sum"
+})
+
+# Raportarea indicatorilor la 1000 locuitori
+for col in ["NR_FIRME", "NSAL", "CFA", "PROFITN", "PIERDEREN"]:
+    df_judet[col] = df_judet[col] * 1000 / df_judet["Populatie"]
+
+# Eliminarea coloanei Populatie
+df_judet = df_judet.drop(columns=["Populatie"])
+
+# Salvarea rezultatului
+df_judet.reset_index().to_csv("Cerinta2.csv", index=False)
+
+
+# ============================================================
+# B. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# B. În fișierul LocationQ.csv se găsesc indicatori de prezență
+#    a activității economice la nivel de județe între anii 2008 și 2021.
+#    Să se efectueze analiza de clusteri prin metoda Ward pe acest set
+#    de date (variabile sunt anii) și să se furnizeze următoarele rezultate:
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# B.1 Matricea ierarhie cu informații privind joncțiunile făcute.
+#     Pentru fiecare joncțiune se va specifica clusterii intrați
+#     în joncțiune, distanța dintre cei doi clusteri și numărul
+#     de instanțe în clusterul nou format.
+#     Matricea va fi afișată la consolă. (1 punct)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea outputului și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+# Citirea fișierului LocationQ.csv
+df_loc = pd.read_csv("LocationQ.csv")
+
+# Considerăm prima coloană identificator (județ)
+judete = df_loc.iloc[:, 0]
+
+# Variabilele sunt anii
+X = df_loc.iloc[:, 1:].values
+
+# Standardizarea datelor
+scaler = StandardScaler()
+X_std = scaler.fit_transform(X)
+
+# Aplicarea metodei Ward
+Z = linkage(X_std, method="ward")
+
+# Afișarea matricei ierarhice
+print("Matricea ierarhică:")
+print(Z)
+
+
+# ------------------------------------------------------------
+# B.2 Graficul dendrogramă pentru partiția optimală. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea graficului dendrogramă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+plt.figure(figsize=(10, 6))
+dendrogram(Z, labels=judete.values)
+plt.title("Dendrogramă – metoda Ward")
+plt.xlabel("Județe")
+plt.ylabel("Distanța")
+plt.show()
+
+
+# ------------------------------------------------------------
+# B.3 Componența partiției optimale.
+#     Pentru fiecare instanță se determină clusterul de care aparține.
+#     Partiția se va salva în fișierul popt.csv. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+# Stabilirea unui număr optim de clusteri (exemplu: 3)
+clusteri = fcluster(Z, t=3, criterion="maxclust")
+
+# Construirea tabelului de rezultat
+df_popt = pd.DataFrame({
+    "Judet": judete,
+    "Cluster": clusteri
+})
+
+# Salvarea partiției optimale
+df_popt.to_csv("popt.csv", index=False)
+
+
+# ============================================================
+# SUBIECTUL SI_2
+# ============================================================
+
+# În fișierul Netflix.csv se află informații referitoare la
+# accesibilitatea platformei Netflix în 57 de țări, în anul 2022.
+#
+# Variabilele sunt următoarele:
+# Tara, Cod - informații despre țară
+# Librarie - numărul total de filme și seriale disponibile
+# CostLunarBasic - tariful abonamentului Basic (USD)
+# CostLunarStandard - tariful abonamentului Standard (USD)
+# CostLunarPremium - tariful abonamentului Premium (USD)
+# Internet - procentul populației cu acces la internet (%)
+# HDI - Indicele de Dezvoltare Umană
+# Venit - salariul mediu lunar (USD)
+# IndiceFericire - indicele fericirii
+# IndiceEducatie - indicele educației
+#
+# În fișierul CoduriTari.csv se află codificări ale țărilor și
+# apartenența la continente.
+# Legătura dintre seturile de date se va face prin codul țării.
+#
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+
+# ============================================================
+# A. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se standardizeze setul de date (se calculează valorile
+#     standardizate ale indicatorilor de la Librarie la
+#     IndiceEducatie) și să se salveze în fișierul Cerinta1.csv
+#     în ordinea descrescătoare după valorile variabilei Internet.
+#     (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Netflix
+df_net = pd.read_csv("Netflix.csv")
+
+# Coduri tari (separator corect!)
+df_codsi2 = pd.read_csv("CoduriTari.csv", sep=",")
+df_codsi2.columns = df_codsi2.columns.str.strip()
+
+# Unire seturi de date dupa Cod
+df_merge = df_net.merge(df_codsi2, on="Cod", how="left",suffixes=("", "_cod"))
+
+# Variabilele care se standardizează
+variabile = [
+    "Librarie",
+    "CostLunarBasic",
+    "CostLunarStandard",
+    "CostLunarPremium",
+    "Internet",
+    "HDI",
+    "Venit",
+    "IndiceFericire",
+    "IndiceEducatie"
+]
+
+# Standardizarea variabilelor
+scaler = StandardScaler()
+X_std = scaler.fit_transform(df_merge[variabile])
+
+df_std = pd.DataFrame(X_std, columns=variabile)
+
+# Reatasare variabile de identificare
+df_std = pd.concat(
+    [df_merge[["Cod", "Tara"]], df_std],
+    axis=1
+)
+
+# Sortare descrescatoare dupa Internet
+df_std = df_std.sort_values(by="Internet", ascending=False)
+
+
+# Salvare rezultat
+df_std.to_csv("Cerinta1si2.csv", index=False)
+# ------------------------------------------------------------
+# A.2 Să se determine coeficienții de variație pentru fiecare
+#     indicator la nivel de continent (coeficientul de variație
+#     este raportul dintre abaterea standard și medie) și să se
+#     salveze în fișierul Cerinta2.csv.
+#     Salvarea se va face în ordine descrescătoare după coeficienții
+#     de variație ai variabilei Librarie. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Calcularea mediei și abaterii standard pe continent
+media = df_merge.groupby("Continent")[variabile].mean()
+std = df_merge.groupby("Continent")[variabile].std()
+
+# Coeficientul de variație
+cv = std / media
+
+# Sortarea descrescătoare după Librarie
+cv = cv.sort_values(by="Librarie", ascending=False)
+
+# Salvarea rezultatului
+cv.reset_index().to_csv("Cerinta2si2.csv", index=False)
+
+
+# ============================================================
+# B. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# B. Să se efectueze analiza în componente principale
+#    standardizată pe setul de date de mai sus
+#    (variabilele observate sunt de la Librarie la IndiceEducatie)
+#    și să se furnizeze următoarele rezultate:
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# B.1 Varianțele componentelor principale.
+#     Varianțele vor fi afișate la consolă. (1 punct)
+#
+# Criteriul de acordare a punctajului:
+# urmărirea outputului și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+X = df_merge[variabile].values
+
+X_std = scaler.fit_transform(X)
+
+pca = PCA()
+scoruri = pca.fit_transform(X_std)
+
+print("Varianțele componentelor principale:")
+for i, v in enumerate(pca.explained_variance_):
+    print(f"PC{i+1}: {v}")
+
+
+# ------------------------------------------------------------
+# B.2 Scorurile asociate instanțelor.
+#     Scorurile vor fi salvate în fișierul scoruri.csv. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+df_scoruri = pd.DataFrame(
+    scoruri,
+    columns=[f"PC{i+1}" for i in range(scoruri.shape[1])]
+)
+
+df_scoruri.insert(0, "Cod", df_merge["Cod"])
+df_scoruri.insert(1, "Tara", df_merge["Tara"])
+
+df_scoruri.to_csv("scoruri.csv", index=False)
+
+
+# ------------------------------------------------------------
+# B.3 Graficul scorurilor în primele două axe principale.
+#     (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea graficului
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+plt.figure(figsize=(8, 6))
+plt.scatter(scoruri[:, 0], scoruri[:, 1])
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+plt.title("Scoruri PCA – Netflix")
+plt.show()
+
+# ============================================================
+# SUBIECTUL SI_3
+# ============================================================
+
+# În fișierul CAEN2_2021_NSAL.csv se află informații referitoare
+# la numărul de angajați pe ramuri ale economiei naționale conform
+# CAEN (coduri de lungime 2), la nivel de localitate în anul 2021.
+# Variabila SIRUTA reprezintă codul Siruta al localității.
+# Celelalte variabile reprezintă număr de angajați pe ramuri
+# de activitate conform CAEN de nivel 2
+# (de exemplu 02 reprezintă "Silvicultura si exploatare forestiera").
+#
+# În fișierul PopulatieLocalitati.csv avem informații despre localități:
+# codul Siruta, denumirea, populația și indicativul de județ.
+# Legătura dintre seturile de date se face prin codul Siruta.
+#
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from factor_analyzer import FactorAnalyzer
+from factor_analyzer.factor_analyzer import calculate_kmo
+
+
+# ============================================================
+# A. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se determine pentru fiecare localitate procentele
+#     de angajați pe fiecare ramură și să se salveze rezultatele
+#     în fișierul Cerinta1.csv. (2 puncte)
+#
+# Exemplu:
+# SIRUTA,01,02,03,05,...,99
+# 1017,0.35,0.04,0.0,0.0,...,0.0
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Citirea fișierului CAEN2_2021_NSAL.csv
+df = pd.read_csv("CAEN2_2021_NSAL.csv")
+
+# Identificarea coloanelor CAEN (toate, mai puțin SIRUTA)
+coloane_caen = df.columns.drop("SIRUTA")
+
+# Calcularea totalului de angajați pe localitate
+total_angajati = df[coloane_caen].sum(axis=1)
+
+# Calcularea procentelor pe fiecare ramură
+df_procente = df.copy()
+df_procente[coloane_caen] = df[coloane_caen].div(total_angajati, axis=0)
+
+# Salvarea rezultatului
+df_procente.to_csv("Cerinta1.csv", index=False)
+
+
+# ------------------------------------------------------------
+# A.2 Să se determine numărul de angajați la 100000 locuitori
+#     la nivel de județ și pentru fiecare ramură.
+#     Numărul de angajați la 100000 locuitori se calculează astfel:
+#     v*100000/p, unde v este numărul de angajați iar p este populația.
+#     Rezultatele vor fi salvate în fișierul Cerinta2.csv. (2 puncte)
+#
+# Exemplu:
+# Judet,01,02,03,05,...,99
+# ab,39.72,24.97,0.31,0.0,...,0.0
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Citirea fișierului PopulatieLocalitati.csv
+df_pop = pd.read_csv("PopulatieLocalitati.csv")
+
+# Unirea datelor după codul SIRUTA
+df_merge = df.merge(df_pop, left_on="SIRUTA",right_on="Siruta", how="left")
+
+# Agregarea angajaților și populației la nivel de județ
+df_judet = df_merge.groupby("Judet").agg(
+    {**{col: "sum" for col in coloane_caen}, "Populatie": "sum"}
+)
+
+# Calculul angajaților la 100000 locuitori
+for col in coloane_caen:
+    df_judet[col] = df_judet[col] * 100000 / df_judet["Populatie"]
+
+# Eliminarea coloanei Populatie
+df_judet = df_judet.drop(columns=["Populatie"])
+
+# Salvarea rezultatului
+df_judet.reset_index().to_csv("Cerinta2.csv", index=False)
+
+
+# ============================================================
+# B. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# B. Să se efectueze analiza factorială, fără rotație de factori,
+#    pe setul de date de mai sus (CAEN2_2021_NSAL) și să se furnizeze
+#    următoarele rezultate:
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# B.1 Aplicarea testului KMO.
+#     Se vor calcula și se vor afișa la consolă indecșii KMO.
+#     (1 punct)
+#
+# Criteriul de acordare a punctajului:
+# afișarea corectă a valorilor
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+# Construirea matricei X (doar variabilele CAEN)
+X = df[coloane_caen].values
+
+
+
+# Calculul indicilor KMO
+kmo_all, kmo_model = calculate_kmo(X)
+
+print("Indicii KMO pentru fiecare variabilă:")
+print(kmo_all)
+print("Indicele KMO global:")
+print(kmo_model)
+
+
+# ------------------------------------------------------------
+# B.2 Scorurile factoriale.
+#     Vor fi salvate în fișierul f.csv. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+# Aplicarea analizei factoriale fără rotație
+fa = FactorAnalyzer(rotation=None)
+fa.fit(X)
+
+# Calcularea scorurilor factoriale
+scoruri = fa.transform(X)
+
+# Salvarea scorurilor
+df_f = pd.DataFrame(
+    scoruri,
+    columns=[f"F{i+1}" for i in range(scoruri.shape[1])]
+)
+
+df_f.insert(0, "SIRUTA", df["SIRUTA"])
+
+df_f.to_csv("f.csv", index=False)
+
+
+# ------------------------------------------------------------
+# B.3 Graficul scorurilor factoriale pentru primii doi factori.
+#     (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea graficului
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+plt.figure(figsize=(8, 6))
+plt.scatter(scoruri[:, 0], scoruri[:, 1])
+plt.xlabel("Factor 1")
+plt.ylabel("Factor 2")
+plt.title("Scoruri factoriale – primii doi factori")
+plt.show()
+
+
+
+# ============================================================
+# SUBIECTUL SI_4
+# ============================================================
+
+# În fișierul E_NSAL_2008-2021.csv se află informații referitoare
+# la numărul de angajați la nivel de localitate în perioada 2008-2021.
+# Anii sunt variabile.
+# Variabila SIRUTA reprezintă codul Siruta al localității.
+# De exemplu, variabila 2008 reprezintă numărul de angajați în anul 2008.
+#
+# În fișierul PopulatieLocalitati.csv avem informații despre localități:
+# codul Siruta, denumirea, populația și indicativul de județ.
+# Legătura dintre seturile de date se face prin codul Siruta.
+#
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+
+# ============================================================
+# A. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se determine pentru fiecare localitate anul în care
+#     au fost înregistrați cei mai mulți angajați.
+#     Rezultatele vor fi salvate în fișierul Cerinta1.csv. (2 puncte)
+#
+# Exemplu:
+# SIRUTA,Anul
+# 1017,2017
+# 1071,2021
+# 1151,2008
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Citirea fișierului E_NSAL_2008-2021.csv
+df = pd.read_csv("E_NSAL_2008-2021.csv")
+
+# Identificarea coloanelor corespunzătoare anilor
+ani = df.columns.drop("SIRUTA")
+
+# Determinarea anului cu numărul maxim de angajați pentru fiecare localitate
+df_c1 = pd.DataFrame({
+    "SIRUTA": df["SIRUTA"],
+    "Anul": df[ani].idxmax(axis=1)
+})
+
+# Salvarea rezultatului
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+
+# ------------------------------------------------------------
+# A.2 Să se determine rata ocupării populației pe fiecare an
+#     și cea medie (media ratei anilor) la nivel de județ.
+#     Rezultatele vor fi salvate în fișierul Cerinta2.csv
+#     în ordinea descrescătoare a ratei medii.
+#     Rata ocupării se calculează ca raport între numărul
+#     de angajați și populația județului. (2 puncte)
+#
+# Exemplu:
+# Judet,2008,2009,...,2021,RataMedie
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Citirea fișierului PopulatieLocalitati.csv
+df_pop = pd.read_csv("PopulatieLocalitati.csv")
+
+# Unirea datelor după codul SIRUTA
+df_merge = df.merge(df_pop, right_on="Siruta", left_on="SIRUTA", how="left")
+
+# Agregarea angajaților și populației la nivel de județ
+df_judet = df_merge.groupby("Judet").agg(
+    {**{an: "sum" for an in ani}, "Populatie": "sum"}
+)
+
+# Calcularea ratelor de ocupare pe fiecare an
+for an in ani:
+    df_judet[an] = df_judet[an] / df_judet["Populatie"]
+
+# Calcularea ratei medii
+df_judet["RataMedie"] = df_judet[ani].mean(axis=1)
+
+# Eliminarea coloanei Populatie
+df_judet = df_judet.drop(columns=["Populatie"])
+
+# Sortarea descrescătoare după rata medie
+df_judet = df_judet.sort_values(by="RataMedie", ascending=False)
+
+# Salvarea rezultatului
+df_judet.reset_index().to_csv("Cerinta2.csv", index=False)
+
+
+# ============================================================
+# B. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# B. Să se efectueze clasificarea pacienților aflați
+#    în blocul post-operator al unui spital.
+#    Variabila țintă este DECISION, cu valorile:
+#    I - îngrijire intensivă
+#    S - externare
+#    A - îngrijire generală
+#    Variabilele predictor sunt măsurători legate de temperatură
+#    și presiunea sângelui (variabilele de la L_CORE la BP_ST).
+#    Variabila Id reprezintă id-ul pacientului.
+#    Setul de învățare-testare este Pacienti.csv.
+#    Setul de aplicare este Pacienti_apply.csv.
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# B.1 Să se aplice analiza liniară discriminantă și să se
+#     calculeze scorurile discriminante.
+#     Acestea vor fi salvate în fișierul z.csv. (1 punct)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+# Citirea setului de antrenare
+df_train = pd.read_csv("Pacienti.csv")
+
+# Variabilele predictor
+predictori = df_train.loc[:, "L_CORE":"BP_ST"].columns
+
+X_train = df_train[predictori].values
+y_train = df_train["DECISION"].values
+
+# Aplicarea analizei liniare discriminante
+lda = LinearDiscriminantAnalysis()
+scoruri = lda.fit_transform(X_train, y_train)
+
+# Salvarea scorurilor discriminante
+df_z = pd.DataFrame(
+    scoruri,
+    columns=[f"LD{i+1}" for i in range(scoruri.shape[1])]
+)
+
+df_z.insert(0, "Id", df_train["Id"])
+df_z.to_csv("z.csv", index=False)
+
+
+# ------------------------------------------------------------
+# B.2 Să se traseze graficul scorurilor discriminante
+#     în primele două axe discriminante. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea graficului
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+plt.figure(figsize=(8, 6))
+plt.scatter(scoruri[:, 0], scoruri[:, 1])
+plt.xlabel("LD1")
+plt.ylabel("LD2")
+plt.title("Scoruri discriminante – LDA")
+plt.show()
+
+
+# ------------------------------------------------------------
+# B.3 Să se analizeze performanțele modelului calculând
+#     matricea de confuzie și indicatorii de acuratețe.
+#     Matricea de confuzie va fi salvată în fișierul matc.csv,
+#     iar indicatorii de acuratețe vor fi afișați la consolă.
+#     (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output, a consolei și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+# Predicția pe setul de antrenare
+y_pred = lda.predict(X_train)
+
+# Matricea de confuzie
+cm = confusion_matrix(y_train, y_pred)
+
+# Salvarea matricei de confuzie
+df_cm = pd.DataFrame(cm)
+df_cm.to_csv("matc.csv", index=False)
+
+# Calculul acurateții
+acc = accuracy_score(y_train, y_pred)
+
+print("Acuratețea modelului LDA:", acc)
+
+# ============================================================
+# SUBIECTUL SI6_2024
+# ============================================================
+
+# În fișierul Diversitate.csv sunt prezentați indicii de diversitate
+# economică la nivel de localitate pe ani.
+# Variabile:
+# Siruta - codul Siruta al localității
+# Localitate - denumirea localității
+# 2008, 2009, ..., 2021 - anii pentru care sunt prezentați indicii
+# de diversitate.
+#
+# În fișierul Coduri_Localitati.csv se află codificarea localităților
+# și împărțirea acestora pe județe.
+# Variabile:
+# Siruta - codul Siruta
+# Localitate - denumirea localității
+# Judet - indicativul de județ
+# Siruta este câmpul de legătură.
+#
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from factor_analyzer import FactorAnalyzer
+
+
+# ============================================================
+# A. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Să se calculeze și să se salveze în fișierul Cerinta1.csv,
+#     localitățile în care cel puțin pentru un an diversitatea
+#     a fost 0.
+#     Se va salva codul Siruta, denumirea localității și indicii
+#     de diversitate pentru toți anii. (2 puncte)
+#
+# Exemplu:
+# Siruta,City,2008,2009,...,2021
+# 3397,Blandiana,0.2406,0.24268,...,0.0
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Citirea fișierului Diversitate.csv
+df = pd.read_csv("Diversitate.csv")
+
+# Identificarea coloanelor corespunzătoare anilor
+ani = df.columns.drop(["Siruta", "Localitate"])
+
+# Selectarea localităților unde există cel puțin un an cu diversitate 0
+mask_zero = (df[ani] == 0).any(axis=1)
+df_c1 = df.loc[mask_zero]
+
+# Salvarea rezultatului
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+
+# ------------------------------------------------------------
+# A.2 Să se determine pentru fiecare județ localitatea în care
+#     diversitatea medie (media anilor) este maximă.
+#     Rezultatul va fi salvat în fișierul Cerinta2.csv.
+#     Se va salva indicativul de județ, localitatea cu diversitatea
+#     medie maximă și valoarea diversității medii. (2 puncte)
+#
+# Exemplu:
+# Judet,Localitate,Diversitate Maxima
+# ab,Municipiul Alba Iulia,0.6811292857142857
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+# Citirea fișierului Coduri_Localitati.csv
+df_cod = pd.read_csv("Coduri_Localitati.csv")
+
+# Unirea datelor după Siruta
+df_merge = df.merge(df_cod, on=["Siruta", "Localitate"], how="left")
+
+# Calcularea diversității medii pe localitate
+df_merge["DiversitateMedie"] = df_merge[ani].mean(axis=1)
+
+# Determinarea localității cu diversitate medie maximă pe județ
+idx = df_merge.groupby("Judet")["DiversitateMedie"].idxmax()
+
+df_c2 = df_merge.loc[idx, ["Judet", "Localitate", "DiversitateMedie"]]
+
+# Salvarea rezultatului
+df_c2.to_csv("Cerinta2.csv", index=False)
+
+
+# ============================================================
+# B. Cerințe
+# ============================================================
+
+# ------------------------------------------------------------
+# B. Să se efectueze analiza factorială pentru indicii de
+#    diversitate, cu rotație Varimax și să se furnizeze
+#    următoarele rezultate:
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# B.1 Varianța factorilor comuni.
+#     Se va salva tabelul varianței în fișierul Varianta.csv.
+#     Se va salva varianța factorilor, procentul de varianță
+#     extrasă și procentul cumulat de varianță. (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.1 ======================
+
+# Construirea matricei X (doar indicii de diversitate)
+
+X = df[ani].values
+
+# Analiza factorială cu rotație Varimax (FĂRĂ standardizare manuală)
+fa = FactorAnalyzer(rotation="varimax")
+fa.fit(X)
+
+# Extragerea varianței factorilor
+var, prop, cum = fa.get_factor_variance()
+
+df_var = pd.DataFrame({
+    "Varianta": var,
+    "Procent": prop,
+    "Procent Cumulat": cum
+})
+
+df_var.to_csv("Varianta.csv", index=False)
+
+
+# ------------------------------------------------------------
+# B.2 Corelațiile factoriale (corelațiile variabile - factori comuni).
+#     Acestea vor fi salvate în fișierul r.csv. (1 punct)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea fișierului output și a codului sursă
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.2 ======================
+
+# Matricea corelațiilor factoriale
+loadings = pd.DataFrame(
+    fa.loadings_,
+    index=ani,
+    columns=[f"F{i+1}" for i in range(fa.loadings_.shape[1])]
+)
+
+
+# Salvarea rezultatului
+loadings.to_csv("r.csv")
+
+
+# ------------------------------------------------------------
+# B.3 Trasarea cercului corelațiilor pentru primii doi factori comuni.
+#     (2 puncte)
+#
+# Criteriul de acordare a punctajului:
+# vizualizarea graficului
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE B.3 ======================
+
+plt.figure(figsize=(6, 6))
+for i, var in enumerate(ani):
+    plt.arrow(0, 0,
+              loadings.iloc[i, 0],
+              loadings.iloc[i, 1],
+              head_width=0.02,
+              length_includes_head=True)
+    plt.text(loadings.iloc[i, 0], loadings.iloc[i, 1], var)
+
+# Cerc unitate
+circle = plt.Circle((0, 0), 1, fill=False)
+plt.gca().add_artist(circle)
+
+plt.axhline(0)
+plt.axvline(0)
+plt.xlabel("Factor 1")
+plt.ylabel("Factor 2")
+plt.title("Cercul corelațiilor – primii doi factori")
+plt.axis("equal")
+plt.show()
