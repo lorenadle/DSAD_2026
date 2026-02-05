@@ -1152,3 +1152,187 @@ plt.ylabel("Frecvență")
 plt.title("Histogramă GNI – partiție Ward (3 clusteri)")
 plt.legend()
 plt.show()
+
+# ============================================================
+# SUBIECT – MiscareaNaturala.csv
+# ============================================================
+#
+# În fișierul MiscareaNaturala.csv sunt prezentați indicatori
+# ai mișcării naturale a populației pe țări (anul 2015).
+#
+# Indicatori:
+# Country_Number – id țară
+# Country_Name – nume țară
+# Three_Letter_Country_Code – cod țară
+# FR – rata fertilității
+# IM – rata mortalității
+# LE – speranța de viață
+# LEF – speranța de viață femei
+# LEM – speranța de viață bărbați
+# MMR – mortalitate maternală
+# RS – rata sporului natural
+#
+# În fișierul CoduriTariExtins.csv se află codificări ale țărilor
+# și împărțirea acestora pe continente.
+#
+# ============================================================
+
+# ============================================================
+# IMPORTURI
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+
+# ============================================================
+# CITIRE DATE
+# ============================================================
+
+df = pd.read_csv("MiscareaNaturala.csv")
+df_cod = pd.read_csv("CoduriTariExtins.csv")
+
+# Curățare coloane
+df.columns = df.columns.str.strip()
+df_cod.columns = df_cod.columns.str.strip()
+
+# Unire după cod țară
+df_merge = df.merge(
+    df_cod,
+    left_on="Three_Letter_Country_Code",
+    right_on="Three_Letter_Country_Code",
+    how="left"
+)
+
+# ============================================================
+# A. CERINȚE
+# ============================================================
+
+# ------------------------------------------------------------
+# A.1 Salvarea în Cerinta1.csv a țărilor în care rata sporului
+#     natural este mai mică decât media globală a RS.
+#
+# Salvare:
+# Three_Letter_Country_Code, Country_Name, RS
+#
+# Ordonare descrescătoare după RS.
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.1 ======================
+
+# Media globală a sporului natural
+rs_medie = df["RS"].mean()
+
+# Filtrare țări sub media globală
+df_c1 = df[df["RS"] < rs_medie]
+
+# Sortare descrescătoare după RS
+df_c1 = df_c1.sort_values(by="RS", ascending=False)
+
+# Selectare coloane
+df_c1 = df_c1[
+    ["Three_Letter_Country_Code", "Country_Name", "RS"]
+]
+
+# Salvare
+df_c1.to_csv("Cerinta1.csv", index=False)
+
+# ------------------------------------------------------------
+# A.2 Determinarea pentru fiecare continent a țărilor cu cele
+#     mai mari valori pentru fiecare indicator.
+#
+# Salvare:
+# Continent_Name, FR, IM, LE, LEF, LEM, MMR, RS
+# (coduri de țară – 3 litere)
+#
+# (2 puncte)
+# ------------------------------------------------------------
+
+# ====================== REZOLVARE A.2 ======================
+
+indicatori = ["FR", "IM", "LE", "LEF", "LEM", "MMR", "RS"]
+
+rez = []
+
+for cont, grup in df_merge.groupby("Continent_Name"):
+    linie = {"Continent_Name": cont}
+    for ind in indicatori:
+        idx = grup[ind].idxmax()
+        linie[ind] = grup.loc[idx, "Three_Letter_Country_Code"]
+    rez.append(linie)
+
+df_c2 = pd.DataFrame(rez)
+
+df_c2.to_csv("Cerinta2.csv", index=False)
+
+# ============================================================
+# B. ANALIZA DE CLUSTERI – METODA WARD
+# ============================================================
+
+# ------------------------------------------------------------
+# B. Analiza de clusteri pe indicatorii:
+# FR, IM, LE, LEF, LEM, MMR, RS
+# ------------------------------------------------------------
+
+X = df[indicatori].values
+
+# Standardizare
+scaler = StandardScaler()
+X_std = scaler.fit_transform(X)
+
+# ------------------------------------------------------------
+# B.1 Matricea ierarhie (Ward)
+#
+# Salvare în h.csv
+# (1 punct)
+# ------------------------------------------------------------
+
+Z = linkage(X_std, method="ward")
+
+df_h = pd.DataFrame(
+    Z,
+    columns=[
+        "Cluster_1",
+        "Cluster_2",
+        "Distanta",
+        "Nr_Observatii"
+    ]
+)
+
+df_h.to_csv("h.csv", index=False)
+
+# ------------------------------------------------------------
+# B.2 Grafic dendrogramă pentru partiția optimală
+# (2 puncte)
+# ------------------------------------------------------------
+
+plt.figure(figsize=(10, 6))
+dendrogram(Z)
+plt.title("Dendrogramă – Mișcarea naturală a populației")
+plt.xlabel("Țări")
+plt.ylabel("Distanță")
+plt.show()
+
+# ------------------------------------------------------------
+# B.3 Componența partiției optimale
+#
+# Salvare în popt.csv:
+# Cod țară, Nume țară, Cluster
+# (2 puncte)
+# ------------------------------------------------------------
+
+# Partiție optimă – exemplu: 3 clusteri
+k = 3
+clustere = fcluster(Z, k, criterion="maxclust")
+
+df_popt = df[
+    ["Three_Letter_Country_Code", "Country_Name"]
+].copy()
+
+df_popt["Cluster"] = clustere
+
+df_popt.to_csv("popt.csv", index=False)
